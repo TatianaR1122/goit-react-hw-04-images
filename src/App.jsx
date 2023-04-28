@@ -1,111 +1,105 @@
-import React, { Component } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import imagesAPI from './services/image-api';
-import { Searchbar } from './components/Searchbar/Searchbar';
-import { ImageGallery } from './components/ImageGallery/ImageGallery';
-import { Modal } from './components/Modal/Modal';
+import Searchbar from './components/Searchbar/Searchbar';
+import ImageGallery from './components/ImageGallery/ImageGallery';
+import Modal from './components/Modal/Modal';
 import { animateScroll } from 'react-scroll';
 import Button from 'components/Button/Button';
 import { Loader } from 'components/Loader/Loader';
 
 import './App.css';
 
-export class App extends Component {
-  state = {
-    findValue: '',
-    pageNumber: 1,
-    images: [],
-    status: 'idle',
-    error: null,
-    showModal: false,
-    largeImageURL: '',
-    showBtn: false,
-  };
+export default function App() {
+  const [findValue, setFindValue] = useState('');
+  const [pageNumber, setPageNumber] = useState(1);
+  const [images, setImages] = useState([]);
+  const [status, setStatus] = useState('idle');
+  const [error, setError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [showBtn, setShowBtn] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState('');
 
-  handleFormSubmit = findValue => {
-    this.setState({
-      findValue: findValue,
-      pageNumber: 1,
-      images: [],
-    });
-  };
+  const isFirstRender = useRef(true);
 
-  componentDidUpdate(_, prevState) {
-    if (
-      prevState.findValue !== this.state.findValue ||
-      prevState.pageNumber !== this.state.pageNumber
-    ) {
-      this.setState({ status: 'pending' });
+  useEffect(() => {
+    const getImages = () => {
+      imagesAPI
+        .fetchImages(findValue, pageNumber)
+        .then(({ hits }) => {
+          if (hits.length === 0) {
+            setStatus('rejected');
+            return;
+          }
+          if (hits.length < 12 || (hits.length !== 0 && hits.length < 12)) {
+            setStatus('resolved');
+            setImages(prevHits => [...prevHits, ...hits]);
+            setShowBtn(false);
+          } else {
+            setStatus('resolved');
+            setImages(prevHits => [...prevHits, ...hits]);
+            setShowBtn(true);
+          }
+          if (pageNumber !== 1) {
+            animateScroll.scrollToBottom({
+              duration: 1000,
+              delay: 10,
+              smooth: 'linear',
+            });
+          }
+        })
+        .catch(error => {
+          setError(error);
+          setStatus('rejected');
+        });
+    };
 
-      this.getImages();
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
-
-    if (prevState.pageNumber !== this.state.pageNumber) {
-      this.scrollOnMoreButton();
+    if (findValue) {
+      setStatus('pending');
+      getImages();
     }
-  }
-  scrollOnMoreButton = () => {
-    animateScroll.scrollToBottom({
-      duration: 1000,
-      delay: 10,
-      smooth: 'linear',
-    });
-  };
-  getImages = () => {
-    const { findValue, pageNumber } = this.state;
+  }, [findValue, pageNumber]);
 
-    imagesAPI
-      .fetchImages(findValue, pageNumber)
-      .then(({ hits, totalHits }) =>
-        this.setState(({ images }) => ({
-          images: [...images, ...hits],
-          status: 'resolved',
-          showBtn: this.state.pageNumber < Math.ceil(totalHits / 12),
-        }))
-      )
-      .catch(error => this.setState({ error, status: 'rejected' }));
+  const handleFormSubmit = findValue => {
+    setFindValue(findValue);
+    setPageNumber(1);
+    setImages([]);
+  };
+  const onLoadMore = () => {
+    setPageNumber(pageNumber => pageNumber + 1);
   };
 
-  onLoadMore = () => {
-    this.setState(prevState => ({
-      pageNumber: prevState.pageNumber + 1,
-    }));
+  const onOpenModal = url => {
+    setLargeImageURL(url);
+    modalToggle();
   };
 
-  onOpenModal = url => {
-    this.setState({ largeImageURL: url });
-    this.modalToggle();
+  const modalToggle = () => {
+    setShowModal(showModal => !showModal);
   };
 
-  modalToggle = () => {
-    this.setState(({ showModal }) => ({ showModal: !showModal }));
-  };
-
-  render() {
-    const { status, error, images, showModal, largeImageURL, showBtn } =
-      this.state;
-
-    return (
-      <div className="App">
-        <Searchbar onSubmit={this.handleFormSubmit} />
-        <ImageGallery
-          status={status}
-          error={error}
-          images={images}
-          onClick={this.onOpenModal}
-          onLoadMore={this.onLoadMore}
-        />
-        {showModal && (
-          <Modal src={largeImageURL} onCloseModal={this.modalToggle} />
-        )}
-        {showBtn && <Button onLoadMore={this.onLoadMore} />}
-        {status === 'idle' && <div className="Info">The gallery is empty</div>}
-        {status === 'pending' && <Loader />}
-        {status === 'rejected' && <div className="Info">We cant find it</div>}
-        <ToastContainer position="top-right" autoClose={2000} theme="colored" />
-      </div>
-    );
-  }
+  return (
+    <div className="App">
+      <Searchbar onSubmit={handleFormSubmit} />
+      <ImageGallery
+        status={status}
+        error={error}
+        images={images}
+        onClick={onOpenModal}
+        onLoadMore={onLoadMore}
+      />
+      {showModal && <Modal src={largeImageURL} onCloseModal={modalToggle} />}
+      {showBtn && <Button onLoadMore={onLoadMore} />}
+      {setStatus === 'idle' && <div className="Info">The gallery is empty</div>}
+      {setStatus === 'pending' && <Loader />}
+      {setStatus === 'rejected' && <div className="Info">We cant find it</div>}
+      <ToastContainer position="top-right" autoClose={2000} theme="colored" />
+    </div>
+  );
 }
