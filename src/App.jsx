@@ -26,20 +26,18 @@ export default function App() {
     if (!findValue) return;
 
     const getImages = () => {
+      setStatus('pending');
       imagesAPI
         .fetchImages(findValue, pageNumber)
-        .then(({ hits }) => {
+        .then(({ hits, totalHits }) => {
           if (hits.length === 0) {
             setStatus('rejected');
             return;
           }
           setStatus('resolved');
           setImages(prevHits => [...prevHits, ...hits]);
-          if (hits.length < 12) {
-            setShowBtn(false);
-          } else {
-            setShowBtn(true);
-          }
+          setShowBtn(pageNumber < Math.ceil(totalHits / 12))
+          
 
           if (pageNumber !== 1) {
             animateScroll.scrollToBottom({
@@ -55,10 +53,10 @@ export default function App() {
         });
     };
 
-    if (findValue) {
-      setStatus('pending');
+   
+      
       getImages();
-    }
+    
   }, [findValue, pageNumber]);
 
   const handleFormSubmit = findValue => {
