@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -22,9 +22,9 @@ export default function App() {
   const [showBtn, setShowBtn] = useState(false);
   const [largeImageURL, setLargeImageURL] = useState('');
 
-  const isFirstRender = useRef(true);
-
   useEffect(() => {
+    if (!findValue) return;
+
     const getImages = () => {
       imagesAPI
         .fetchImages(findValue, pageNumber)
@@ -33,15 +33,14 @@ export default function App() {
             setStatus('rejected');
             return;
           }
-          if (hits.length < 12 || (hits.length !== 0 && hits.length < 12)) {
-            setStatus('resolved');
-            setImages(prevHits => [...prevHits, ...hits]);
+          setStatus('resolved');
+          setImages(prevHits => [...prevHits, ...hits]);
+          if (hits.length < 12) {
             setShowBtn(false);
           } else {
-            setStatus('resolved');
-            setImages(prevHits => [...prevHits, ...hits]);
             setShowBtn(true);
           }
+
           if (pageNumber !== 1) {
             animateScroll.scrollToBottom({
               duration: 1000,
@@ -56,10 +55,6 @@ export default function App() {
         });
     };
 
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
     if (findValue) {
       setStatus('pending');
       getImages();
